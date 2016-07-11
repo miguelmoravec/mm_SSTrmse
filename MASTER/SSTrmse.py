@@ -3,7 +3,6 @@
 #This script automatically generates plots of SST RMSE over the Pacific for the current and last calendar year
 #This script relies on a standard naming convention of daily SST NetCDF files in this directory: /net2/sdu/NMME/oisst/NetCDF/
 #This script also relies on the relevent des file 'ecda_v31_ocean.ensm.des' being located in this directory: /home/x1y/gfdl/ecda_operational/sst/ecda_v31_ocean.ensm.des
-#This script also relies on the presence of two jnl files, '1head.jnl' and '2body.jnl', in the local directory
 
 import subprocess
 import datetime
@@ -88,22 +87,71 @@ def mymain():
 
 	filename = 'sst_amo_' + month + '_' + year + '.png'
 
-	cmd6 = "go 1head.jnl"
+	header()
+	
 	cmd7 = "use " + sst_outfile_combo
 	cmd8 = "let temp2 = temp[d=2, gxy=sst[d=1],gt=sst[d=1]@asn]"
 	cmd9 = "let err1 = sst[d=1,z=0,l=1:" + timeline + "] - temp2[d=2,l=1:" + timeline+ "]"
-	cmd10 = "go 2body.jnl"
 	cmd11 = 'FRAME/FILE=' + filename
 
-	(errval, errmsg) = pyferret.run(cmd6)
 	(errval, errmsg) = pyferret.run(cmd7)
 	(errval, errmsg) = pyferret.run(cmd8)
 	(errval, errmsg) = pyferret.run(cmd9)
-	(errval, errmsg) = pyferret.run(cmd10)
+
+	body()
+
 	(errval, errmsg) = pyferret.run(cmd11)
 
 	print 'Plot image file for SST RMSE ', year_prev, '/', year, ' is located in the local directory (if data was available) and is named: ', filename
 	print 'If no plots generated, please see script comments to find necessary input files.'
+
+def header():
+	
+	#pyferret header
+
+	com1 = 'cancel data/all'
+	com2 = 'def sym print_opt $1"0"'
+	com3 = 'set mem/size=240'
+	com4 = 'use /home/x1y/gfdl/ecda_operational/sst/ecda_v31_ocean.ensm.des'
+
+	(errval, errmsg) = pyferret.run(com1)
+	(errval, errmsg) = pyferret.run(com2)
+	(errval, errmsg) = pyferret.run(com3)
+	(errval, errmsg) = pyferret.run(com4)
+
+def body():
+	
+	#pyferret body
+
+	com5 = 'let var1 = err1^2; let rms10 = var1[x=@ave,y=40n:90n@ave]^0.5'
+	com6 = 'let rms11 = var1[x=@ave,y=40s:90s@ave]^0.5'
+	com7 = 'list rms10+rms11'
+	com8 = 'let var1 = err1^2; let rms1 = var1[x=@ave,y=30s:30n@ave]^0.5'
+	com9 = 'list rms1'
+	com10 = 'set win 1'
+	com11 = 'cancel mode nodata_lab'
+	com12 = 'set viewport upper'
+	com13 = 'cancel mode nodata_lab'
+	com14 = 'plot/vl=0.0:1.5:0.1/line=1/DASH rms1'
+	com15 = 'set viewport lower'
+	com16 = 'set region/y=30s:30n'
+	com17 = 'sha/lev=(0.,2.0,0.25)(2.0,3.0,0.5) var1[y=30s:30n,l=1:18@ave]^0.5'
+	com18 = 'set mode/last verify'
+
+	(errval, errmsg) = pyferret.run(com5)
+	(errval, errmsg) = pyferret.run(com6)
+	(errval, errmsg) = pyferret.run(com7)
+	(errval, errmsg) = pyferret.run(com8)
+	(errval, errmsg) = pyferret.run(com9)
+	(errval, errmsg) = pyferret.run(com10)
+	(errval, errmsg) = pyferret.run(com11)
+	(errval, errmsg) = pyferret.run(com12)
+	(errval, errmsg) = pyferret.run(com13)
+	(errval, errmsg) = pyferret.run(com14)
+	(errval, errmsg) = pyferret.run(com15)
+	(errval, errmsg) = pyferret.run(com16)
+	(errval, errmsg) = pyferret.run(com17)
+	(errval, errmsg) = pyferret.run(com18)
 
 if __name__=="__main__":
     mymain()
