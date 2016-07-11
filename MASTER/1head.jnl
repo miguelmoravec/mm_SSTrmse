@@ -1,0 +1,10 @@
+\can mode verify
+
+cancel data/all
+
+def sym print_opt $1"0"
+
+set mem/size=240
+use /home/x1y/gfdl/ecda_operational/sst/ecda_v31_ocean.ensm.des
+
+
