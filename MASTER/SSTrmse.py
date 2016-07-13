@@ -1,14 +1,15 @@
 #!/usr/bin/env python
 
-#Written by Miguel M. Moravec. For questions pleace email miguel.moravec@vanderbilt.edu
+#Written by Miguel M. Moravec thanks to the teachings of Garrett Wright. For questions please email miguel.moravec@vanderbilt.edu
 #This script automatically generates plots of SST RMSE over the Pacific for the current and last calendar year
 #This script relies on a standard naming convention of daily SST NetCDF files in this directory: /archive/nmme/NMME/INPUTS/oisst
-#This script also relies on the relevent des file 'ecda_v31_ocean.ensm.des' being located in this directory: /home/x1y/gfdl/ecda_operational/sst/ecda_v31_ocean.ensm.des
+#This script also relies on monthly ocean SST NetCDFs from this directory: /archive/x1y/FMS/c3/CM2.1_ECDA/CM2.1R_ECDA_v3.1_1960_pfl_auto/gfdl.ncrc3-intel-prod-openmp/history/tmp/
 
-import subprocess
+import subprocess as p
 import datetime
 import os
 import os.path
+import glob
 
 try:
     import pyferret
@@ -23,8 +24,6 @@ def mymain():
 	print 'Please answer the following question to plot SST RMSE over the Pacific for the current and last calendar year...'
 	today = raw_input("Enter desired end date (mmyyyy): ")
 
-	
-
 	date = datetime.datetime.strptime('25' + today, '%d%m%Y')
 	month = date.strftime('%m')
 	month_abrev = date.strftime('%b')
@@ -37,16 +36,37 @@ def mymain():
 
 	print 'Generating plots with available data from ', year_prev, '/', year, '...'
 
+	#makes des file using XLY's make_des program to create file with locations of all relevant ocean SST netCDF's
+	
+	d ="." #the local directory
+
+	finput = "/archive/x1y/FMS/c3/CM2.1_ECDA/CM2.1R_ECDA_v3.1_1960_pfl_auto/gfdl.ncrc3-intel-prod-openmp/history/tmp/*.ocean_month.ensm.nc"
+	child = p.Popen(["dmget", finput],cwd=d)
+	myout, myerr = child.communicate()
+	cmd = ["/home/atw/util/make_des"]
+	outputfile='ecda_v31_ocean_auto.des'
+	flist = glob.glob(finput)
+	[cmd.append(item) for item in flist]
+	chd = p.Popen(cmd, stdout=p.PIPE, stderr=p.PIPE)
+	# then when you "communicate", you will be returned three things, an return code (which we talked about before), and the contents of the pipes:
+	myout, myerr = chd.communicate()
+	print myerr
+	#great, now the contents that you'd like to be written to a file is in the variable myout as a string
+	#we will open, attempt the write and this syntax will close the file if all goes well.
+	with open(outputfile,'w') as F:
+	    F.write(myout)
+
+
 	sst_outfile = "sstcm21_oimonthly_" + year + ".nc"
 	sst_outfile_prev = "sstcm21_oimonthly_" + year_prev + ".nc"
 	sst_outfile_combo = "sstcm21_oimonthly_" + year_prev_abrev + year_abrev + ".nc"
 
 	#lines 44-99 replace Xiaosong's csh script and make one NetCDF file in the local dir with two calendar years worth of daily SST data averaged monthly
 
+	
+
 	pyferret.start(quiet=True)
 	os.remove("ferret.jnl")
-
-	d ="." #the local directory
 
 	if os.path.isfile("tmp1.nc"):
 		os.remove("tmp1.nc")
@@ -66,7 +86,7 @@ def mymain():
 			cmd1 = 'use ' + file_loc_alt
 		else:	
 			print 'dmgetting archived data files (this may take a while)'
-			child = subprocess.Popen(["dmget", file_loc],cwd=d)
+			child = p.Popen(["dmget", file_loc],cwd=d)
         		child.communicate()
 			cmd1 = 'use ' + file_loc
 			
@@ -83,7 +103,7 @@ def mymain():
 			cmd1 = 'use ' + file_loc_alt
 		else:
 			print 'dmgetting archived data files (this may take a while)'	        	
-			child = subprocess.Popen(["dmget", file_loc],cwd=d)
+			child = p.Popen(["dmget", file_loc],cwd=d)
 	        	child.communicate()
 			cmd1 = 'use ' + file_loc
 
@@ -102,15 +122,15 @@ def mymain():
 
 	#Using the command shell, data files are concatenated in the local directory. The new NetCDF file containing averaged SST data from both calendar years will be here
 
-	child = subprocess.Popen(["ncrename","-v", "SST_MONTH,temp", "tmp1.nc"],cwd=d)
+	child = p.Popen(["ncrename","-v", "SST_MONTH,temp", "tmp1.nc"],cwd=d)
 	child.communicate()
-	child = subprocess.Popen(["ncrename","-v", "TMONTH,t", "tmp1.nc"],cwd=d)
+	child = p.Popen(["ncrename","-v", "TMONTH,t", "tmp1.nc"],cwd=d)
 	child.communicate() 
-	child = subprocess.Popen(["ncrename","-d", "TMONTH,t", "tmp1.nc"],cwd=d)
+	child = p.Popen(["ncrename","-d", "TMONTH,t", "tmp1.nc"],cwd=d)
 	child.communicate() 
-	child = subprocess.Popen(["ncrcat","-O","-v","temp", "tmp1.nc", sst_outfile],cwd=d)
+	child = p.Popen(["ncrcat","-O","-v","temp", "tmp1.nc", sst_outfile],cwd=d)
 	child.communicate()
-   	child = subprocess.Popen(["ncrcat", "/home/x1y/gfdl/ecda_operational/sst/" + sst_outfile_prev, sst_outfile, sst_outfile_combo],cwd=d)
+   	child = p.Popen(["ncrcat", "/home/x1y/gfdl/ecda_operational/sst/" + sst_outfile_prev, sst_outfile, sst_outfile_combo],cwd=d)
 	child.communicate()
 
 	returnCode = child.returncode
@@ -150,7 +170,7 @@ def header():
 	com1 = 'cancel data/all'
 	com2 = 'def sym print_opt $1"0"'
 	com3 = 'set mem/size=240'
-	com4 = 'use /home/x1y/gfdl/ecda_operational/sst/ecda_v31_ocean.ensm.des'
+	com4 = 'use ecda_v31_ocean_auto.des'
 
 	(errval, errmsg) = pyferret.run(com1)
 	(errval, errmsg) = pyferret.run(com2)
