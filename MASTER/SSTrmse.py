@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
+#Written by Miguel M. Moravec. For questions pleace email miguel.moravec@vanderbilt.edu
 #This script automatically generates plots of SST RMSE over the Pacific for the current and last calendar year
-#This script relies on a standard naming convention of daily SST NetCDF files in this directory: /net2/sdu/NMME/oisst/NetCDF/
+#This script relies on a standard naming convention of daily SST NetCDF files in this directory: /archive/nmme/NMME/INPUTS/oisst
 #This script also relies on the relevent des file 'ecda_v31_ocean.ensm.des' being located in this directory: /home/x1y/gfdl/ecda_operational/sst/ecda_v31_ocean.ensm.des
 
 import subprocess
@@ -22,6 +23,8 @@ def mymain():
 	print 'Please answer the following question to plot SST RMSE over the Pacific for the current and last calendar year...'
 	today = raw_input("Enter desired end date (mmyyyy): ")
 
+	
+
 	date = datetime.datetime.strptime('25' + today, '%d%m%Y')
 	month = date.strftime('%m')
 	month_abrev = date.strftime('%b')
@@ -34,15 +37,16 @@ def mymain():
 
 	print 'Generating plots with available data from ', year_prev, '/', year, '...'
 
-
 	sst_outfile = "sstcm21_oimonthly_" + year + ".nc"
 	sst_outfile_prev = "sstcm21_oimonthly_" + year_prev + ".nc"
 	sst_outfile_combo = "sstcm21_oimonthly_" + year_prev_abrev + year_abrev + ".nc"
 
+	#lines 44-99 replace Xiaosong's csh script and make one NetCDF file in the local dir with two calendar years worth of daily SST data averaged monthly
+
 	pyferret.start(quiet=True)
 	os.remove("ferret.jnl")
 
-	#the following replaces Xiasong's csh file, and makes one NetCDF file with two years worth of daily SST data averaged monthly
+	d ="." #the local directory
 
 	if os.path.isfile("tmp1.nc"):
 		os.remove("tmp1.nc")
@@ -51,9 +55,39 @@ def mymain():
 		os.remove(sst_outfile_combo)
 
 	if month == "01":
-		cmd1 = 'use /net2/sdu/NMME/oisst/NetCDF/sstcm2_daily_' + year_prev_abrev + '0101_' + year_abrev + month + '01.nc'	
+
+		#Janurary is a special case that can only consider sst data from the previous year, and so the file naming convention for the desired data file is unique
+		#Looks for files in Seth's directory, /net2/sdu/..., to avoid dmgetting the archive if possible
+
+        	file_loc = '/archive/nmme/NMME/INPUTS/oisst/sstcm2_daily_' + year_prev_abrev + '0101_' + year_abrev + month + '01.nc'
+		file_loc_alt = '/net2/sdu/NMME/oisst/NetCDF/sstcm2_daily_' + year_prev_abrev + '0101_' + year_abrev + month + '01.nc'	
+
+		if os.path.isfile(file_loc_alt):
+			cmd1 = 'use ' + file_loc_alt
+		else:	
+			print 'dmgetting archived data files (this may take a while)'
+			child = subprocess.Popen(["dmget", file_loc],cwd=d)
+        		child.communicate()
+			cmd1 = 'use ' + file_loc
+			
+	
 	else:
-		cmd1 = 'use /net2/sdu/NMME/oisst/NetCDF/sstcm2_daily_' + year_abrev + '0101_' + year_abrev + month + '01.nc'
+
+		#All other months obey this file naming convention for their data files
+		#Looks for files in Seth's directory, /net2/sdu/..., to avoid dmgetting the archive if possible
+
+		file_loc = '/archive/nmme/NMME/INPUTS/oisst/sstcm2_daily_' + year_abrev + '0101_' + year_abrev + month + '01.nc'
+		file_loc_alt = '/net2/sdu/NMME/oisst/NetCDF/sstcm2_daily_' + year_abrev + '0101_' + year_abrev + month + '01.nc'
+
+		if os.path.isfile(file_loc_alt):
+			cmd1 = 'use ' + file_loc_alt
+		else:
+			print 'dmgetting archived data files (this may take a while)'	        	
+			child = subprocess.Popen(["dmget", file_loc],cwd=d)
+	        	child.communicate()
+			cmd1 = 'use ' + file_loc
+
+	#The following sets the necessary parameters in pyferret	
 
 	cmd2 = 'set memory/size=400'
 	cmd3 = 'DEFINE AXIS/T=15-jan-' + year + ':15-' + month_abrev_low + '-' + year + ':1/npoint=' + month + '/UNIT=month tmonth'
@@ -66,7 +100,7 @@ def mymain():
 	(errval, errmsg) = pyferret.run(cmd4)
 	(errval, errmsg) = pyferret.run(cmd5)
 
-	d ="."
+	#Using the command shell, data files are concatenated in the local directory. The new NetCDF file containing averaged SST data from both calendar years will be here
 
 	child = subprocess.Popen(["ncrename","-v", "SST_MONTH,temp", "tmp1.nc"],cwd=d)
 	child.communicate()
@@ -83,7 +117,7 @@ def mymain():
 
 	os.remove("tmp1.nc")
 
-	#the following automates the pyferret plot generation and saves a png image file in the local directory
+	#the following automates the pyferret plot generation and saves a png image file in the local dir
 
 	filename = 'sst_amo_' + month + '_' + year + '.png'
 
@@ -92,7 +126,9 @@ def mymain():
 	cmd7 = "use " + sst_outfile_combo
 	cmd8 = "let temp2 = temp[d=2, gxy=sst[d=1],gt=sst[d=1]@asn]"
 	cmd9 = "let err1 = sst[d=1,z=0,l=1:" + timeline + "] - temp2[d=2,l=1:" + timeline+ "]"
-	cmd11 = 'FRAME/FILE=' + filename
+	cmd11 = 'sha/lev=(0.,2.0,0.25)(2.0,3.0,0.5) var1[y=30s:30n,l=1:' + timeline + '@ave]^0.5'
+	cmd12 = 'set mode/last verify'
+	cmd13 = 'FRAME/FILE=' + filename
 
 	(errval, errmsg) = pyferret.run(cmd7)
 	(errval, errmsg) = pyferret.run(cmd8)
@@ -101,13 +137,15 @@ def mymain():
 	body()
 
 	(errval, errmsg) = pyferret.run(cmd11)
+	(errval, errmsg) = pyferret.run(cmd12)
+	(errval, errmsg) = pyferret.run(cmd13)
 
 	print 'Plot image file for SST RMSE ', year_prev, '/', year, ' is located in the local directory (if data was available) and is named: ', filename
 	print 'If no plots generated, please see script comments to find necessary input files.'
 
 def header():
 	
-	#pyferret header
+	#the following clears data from previously running pyferrets, establishes base parameters, and loads ensemble data
 
 	com1 = 'cancel data/all'
 	com2 = 'def sym print_opt $1"0"'
@@ -121,7 +159,7 @@ def header():
 
 def body():
 	
-	#pyferret body
+	#the following calculates, lists, and plots RMSE. This method depends on functions computed in the main method
 
 	com5 = 'let var1 = err1^2; let rms10 = var1[x=@ave,y=40n:90n@ave]^0.5'
 	com6 = 'let rms11 = var1[x=@ave,y=40s:90s@ave]^0.5'
@@ -135,8 +173,6 @@ def body():
 	com14 = 'plot/vl=0.0:1.5:0.1/line=1/DASH rms1'
 	com15 = 'set viewport lower'
 	com16 = 'set region/y=30s:30n'
-	com17 = 'sha/lev=(0.,2.0,0.25)(2.0,3.0,0.5) var1[y=30s:30n,l=1:18@ave]^0.5'
-	com18 = 'set mode/last verify'
 
 	(errval, errmsg) = pyferret.run(com5)
 	(errval, errmsg) = pyferret.run(com6)
@@ -150,8 +186,7 @@ def body():
 	(errval, errmsg) = pyferret.run(com14)
 	(errval, errmsg) = pyferret.run(com15)
 	(errval, errmsg) = pyferret.run(com16)
-	(errval, errmsg) = pyferret.run(com17)
-	(errval, errmsg) = pyferret.run(com18)
+
 
 if __name__=="__main__":
     mymain()
