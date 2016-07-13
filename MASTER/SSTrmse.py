@@ -2,7 +2,7 @@
 
 #Written by Miguel M. Moravec thanks to the teachings of Garrett Wright. For questions please email miguel.moravec@vanderbilt.edu
 #This script automatically generates plots of SST RMSE over the Pacific for the current and last calendar year
-#This script relies on a standard naming convention of daily SST NetCDF files in this directory: /archive/nmme/NMME/INPUTS/oisst
+#This script relies on a standard naming convention of daily SST NetCDF files in this directory: /archive/nmme/NMME/INPUTS/oisst/
 #This script also relies on monthly ocean SST NetCDFs from this directory: /archive/x1y/FMS/c3/CM2.1_ECDA/CM2.1R_ECDA_v3.1_1960_pfl_auto/gfdl.ncrc3-intel-prod-openmp/history/tmp/
 
 import subprocess as p
@@ -34,6 +34,10 @@ def mymain():
 	year_prev_abrev = year_prev[-2:]
 	timeline = str(int(month)+11)
 
+	sst_outfile = "sstcm21_oimonthly_" + year + ".nc"
+	sst_outfile_prev = "sstcm21_oimonthly_" + year_prev + ".nc"
+	sst_outfile_combo = "sstcm21_oimonthly_" + year_prev_abrev + year_abrev + ".nc"
+
 	print 'Generating plots with available data from ', year_prev, '/', year, '...'
 
 	#makes des file using XLY's make_des program to create file with locations of all relevant ocean SST netCDF's
@@ -56,14 +60,7 @@ def mymain():
 	with open(outputfile,'w') as F:
 	    F.write(myout)
 
-
-	sst_outfile = "sstcm21_oimonthly_" + year + ".nc"
-	sst_outfile_prev = "sstcm21_oimonthly_" + year_prev + ".nc"
-	sst_outfile_combo = "sstcm21_oimonthly_" + year_prev_abrev + year_abrev + ".nc"
-
-	#lines 44-99 replace Xiaosong's csh script and make one NetCDF file in the local dir with two calendar years worth of daily SST data averaged monthly
-
-	
+	#lines 44-99 replace Xiaosong's csh script and make one NetCDF file in the local dir with two calendar years worth of daily SST data averaged monthly	
 
 	pyferret.start(quiet=True)
 	os.remove("ferret.jnl")
@@ -90,7 +87,6 @@ def mymain():
         		child.communicate()
 			cmd1 = 'use ' + file_loc
 			
-	
 	else:
 
 		#All other months obey this file naming convention for their data files
@@ -160,7 +156,7 @@ def mymain():
 	(errval, errmsg) = pyferret.run(cmd12)
 	(errval, errmsg) = pyferret.run(cmd13)
 
-	print 'Plot image file for SST RMSE ', year_prev, '/', year, ' is located in the local directory (if data was available) and is named: ', filename
+	print 'Plot image file for SST RMSE ', year_prev, '/', year, ' since ', month_abrev,' is located in the local directory (if data was available) and is named: ', filename
 	print 'If no plots generated, please see script comments to find necessary input files.'
 
 def header():
