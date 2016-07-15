@@ -207,6 +207,7 @@ def mymain(argv):
 		print 'SUCCESS. Plot image file for Pacific SST RMSE ', year_prev, '/', year, ' since ', month_abrev,' is located in the local directory and is named: ', filename
 	else:
 		print "ERROR. No plots generated. Please ensure data files are located in their proper directories. See '-h'"
+		exit(1)
 
 def header():
 	
