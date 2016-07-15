@@ -98,7 +98,6 @@ def mymain(argv):
 	flist = glob.glob(finput)
 	[cmd.append(item) for item in flist]
 	chd = p.Popen(cmd, stdout=p.PIPE, stderr=p.PIPE)
-	# then when you "communicate", you will be returned three things, an return code (which we talked about before), and the contents of the pipes:
 	myout, myerr = chd.communicate()
 	print myerr
 	with open(outputfile,'w') as F:
