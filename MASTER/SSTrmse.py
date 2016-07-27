@@ -86,6 +86,12 @@ def mymain(argv):
 
 	print 'Generating plots with available data from ', year_prev, '/', year, '...'
 
+	#checks to see if necessary nc files are available
+
+	if not os.path.isfile('/archive/x1y/FMS/c3/CM2.1_ECDA/CM2.1R_ECDA_v3.1_1960_pfl_auto/gfdl.ncrc3-intel-prod-openmp/history/tmp/' + year + month + '01.ocean_month.ensm.nc'):
+		print 'ERROR: NetCDF data not available yet for ' + month + '/' + year + '. Exiting . . . '
+		exit(1)
+
 	#the following makes des file using XLY's make_des program to create file with locations of all relevant ocean SST netCDF's
 	
 	d ="." #the local directory
@@ -102,8 +108,12 @@ def mymain(argv):
 	print myerr
 	with open(outputfile,'w') as F:
 	    F.write(myout)
+
 	if os.path.isfile(str(outputfile))==False:
 		print "ERROR. Make_des process fail. Please ensure data files are located in their proper directories. See '-h'. \nExiting . . ."
+		exit(1)
+	if not '&FORMAT_RECORD' in open(outputfile).read():
+    		print "ERROR. Make_des process fail. Please ensure data files are located in their proper directories. See '-h'. \nExiting . . ."
 		exit(1)
 
 	#lines 44-99 replace Xiaosong's csh script and make one NetCDF file in the local dir with two calendar years worth of daily SST data averaged monthly	
