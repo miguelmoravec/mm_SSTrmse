@@ -4,6 +4,7 @@
 #This script automatically generates plots of Pacific SST RMSE for the current and last calendar year
 #This script relies on a standard naming convention of daily SST NetCDF files in this directory: /archive/nmme/NMME/INPUTS/oisst/
 #This script also relies on monthly ocean SST NetCDFs from this directory: /archive/x1y/FMS/c3/CM2.1_ECDA/CM2.1R_ECDA_v3.1_1960_pfl_auto/gfdl.ncrc3-intel-prod-openmp/history/tmp/
+#For best results, this script should be run from '/home/x1y/gfdl/ecda_operational/sst/' !!!!
 
 import subprocess as p
 import datetime
@@ -11,6 +12,7 @@ import os
 import os.path
 import glob
 import sys, getopt
+from dateutil import relativedelta
 
 try:
 	import pyferret
@@ -43,6 +45,7 @@ def mymain(argv):
 			print '/archive/nmme/NMME/INPUTS/oisst/ \n'
 			print 'This script also relies on monthly ocean SST NetCDFs from this directory:'
 			print '/archive/x1y/FMS/c3/CM2.1_ECDA/CM2.1R_ECDA_v3.1_1960_pfl_auto/gfdl.ncrc3-intel-prod-openmp/history/tmp/ \n'
+			print 'For best results, this script should be run from "/home/x1y/gfdl/ecda_operational/sst/" !!!! \n'
 			print 'Written by Miguel M. Moravec. For questions please email miguel.moravec@vanderbilt.edu \n'
         		sys.exit()
 
@@ -92,20 +95,55 @@ def mymain(argv):
 		print 'ERROR: NetCDF data not available yet for ' + month + '/' + year + '. Exiting . . . '
 		exit(1)
 
-	#the following makes des file using XLY's make_des program to create file with locations of all relevant ocean SST netCDF's
+
 	
 	d ="." #the local directory
+
+	filename = str('/archive/x1y/FMS/c3/CM2.1_ECDA/CM2.1R_ECDA_v3.1_1960_pfl_auto/gfdl.ncrc3-intel-prod-openmp/history/tmp/' + year + month + '01.ocean_month.ensm.nc' )
+
+	count = 11 + int(month)
+
+	dlist = [filename] #will be list of netCDF files after loop is finished
+
+	datel = date #date for the loop
+
+	check = 0 #error return
+
+	while count > 0:
+
+		#generates list of relevant netCDF files one month at a time to be made into a DES file 
+
+		count = count - 1
+
+		datel = datel + relativedelta.relativedelta(months=-1)
+		monthl = datel.strftime('%m')
+		yearl = datel.strftime('%Y')
+
+		filename = str('/archive/x1y/FMS/c3/CM2.1_ECDA/CM2.1R_ECDA_v3.1_1960_pfl_auto/gfdl.ncrc3-intel-prod-openmp/history/tmp/' + yearl + monthl + '01.ocean_month.ensm.nc' ) 	
+
+		if os.path.isfile(filename):
+			dlist.append(filename) #adds filename for particular date to list
+
+		else:
+			print 'ERROR. No data for ' + monthl + '/' + yearl + '!'
+			if yearl == year_prev:
+				timeline = str(int(month) - 1)
+				check = 1 #reports that no data available for prev year, affecting calculations later
+
+	#the following makes a des file using XLY's make_des program and dmget
 
 	finput = "/archive/x1y/FMS/c3/CM2.1_ECDA/CM2.1R_ECDA_v3.1_1960_pfl_auto/gfdl.ncrc3-intel-prod-openmp/history/tmp/*.ocean_month.ensm.nc"
 	child = p.Popen(["dmget", finput],cwd=d)
 	myout, myerr = child.communicate()
+
 	cmd = ["/home/atw/util/make_des"]
 	outputfile='ecda_v31_ocean_auto.des'
-	flist = glob.glob(finput)
-	[cmd.append(item) for item in flist]
+	[cmd.append(item) for item in dlist]
+
 	chd = p.Popen(cmd, stdout=p.PIPE, stderr=p.PIPE)
 	myout, myerr = chd.communicate()
 	print myerr
+
 	with open(outputfile,'w') as F:
 	    F.write(myout)
 
@@ -116,7 +154,7 @@ def mymain(argv):
     		print "ERROR. Make_des process fail. Please ensure data files are located in their proper directories. See '-h'. \nExiting . . ."
 		exit(1)
 
-	#lines 44-99 replace Xiaosong's csh script and make one NetCDF file in the local dir with two calendar years worth of daily SST data averaged monthly	
+	#lines 44-99 replace Xiaosong's csh script and makeS one NetCDF file in the local dir with two calendar years worth of daily SST data averaged monthly	
 
 	if ( not pyferret.start(quiet=True, journal=False, unmapped=True) ):
 		print "ERROR. Pyferret start failed. Exiting . . ."
@@ -183,20 +221,38 @@ def mymain(argv):
 	child.communicate() 
 	child = p.Popen(["ncrcat","-O","-v","temp", "tmp1.nc", sst_outfile],cwd=d)
 	child.communicate()
-   	child = p.Popen(["ncrcat", "/home/x1y/gfdl/ecda_operational/sst/" + sst_outfile_prev, sst_outfile, sst_outfile_combo],cwd=d)
-	child.communicate()
+
+	if check == 0:
+
+		if not os.path.isfile("/home/x1y/gfdl/ecda_operational/sst/" + sst_outfile_prev): 
+			#if last year's daily SST data not averaged monthly, runs this script for last year creating needed file, then deletes the irrelevant generated image
+			child = p.Popen(["python","SSTrmse.py", "-d", '12' + year_prev ],cwd=d)
+			child.communicate()
+			print '***DISREGARD PRECEDING ERRORS***'
+			child = p.Popen(["ncrcat", sst_outfile_prev, sst_outfile, sst_outfile_combo],cwd=d)
+			child.communicate()
+			os.remove('sst_amo_' + year_prev + '_12.png')
+			
+		else:		
+			child = p.Popen(["ncrcat", "/home/x1y/gfdl/ecda_operational/sst/" + sst_outfile_prev, sst_outfile, sst_outfile_combo],cwd=d)
+			child.communicate()
+
+		cmd7 = "use " + sst_outfile_combo
+
+	else:
+		print "WARNING: Only considering one year's worth of data..."
+		cmd7 = "use " + sst_outfile 
+		
 
 	returnCode = child.returncode
 
-	os.remove("tmp1.nc")
-
 	#the following automates the pyferret plot generation and saves a png image file in the local dir
 
-	filename = 'sst_amo_' + month + '_' + year + '.png'
+	filename = 'sst_amo_' + year + '_' + month + '.png'
 
 	header()
 	
-	cmd7 = "use " + sst_outfile_combo
+	#cmd7 = "use " + sst_outfile_combo
 	cmd8 = "let temp2 = temp[d=2, gxy=sst[d=1],gt=sst[d=1]@asn]"
 	cmd9 = "let err1 = sst[d=1,z=0,l=1:" + timeline + "] - temp2[d=2,l=1:" + timeline+ "]"
 	cmd11 = 'sha/lev=(0.,2.0,0.25)(2.0,3.0,0.5) var1[y=30s:30n,l=1:' + timeline + '@ave]^0.5'
@@ -213,8 +269,16 @@ def mymain(argv):
 	(errval, errmsg) = pyferret.run(cmd12)
 	(errval, errmsg) = pyferret.run(cmd13)
 
+	#file clean up
+	if os.path.exists("tmp1.nc"):
+		os.remove("tmp1.nc")
+
 	if os.path.exists(str(filename)):
-		print 'SUCCESS. Plot image file for Pacific SST RMSE ', year_prev, '/', year, ' since ', month_abrev,' is located in the local directory and is named: ', filename
+		if check == 0:
+			print 'SUCCESS. Plot image file for Pacific SST RMSE ' + year_prev + '/' + year + ' since ' + month_abrev + ' is located in the local directory and is named: ' + filename
+
+		if check == 1:
+			print 'ERROR. PARTIAL SUCCESS. Plot image file for Pacific SST RMSE (' + year + ' ONLY!!!) is located in the local directory and is named: ' + filename
 	else:
 		print "ERROR. No plots generated. Please ensure data files are located in their proper directories. See '-h'"
 		exit(1)
