@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 
 #Written by Miguel M. Moravec thanks to the teachings of Garrett Wright. For questions please email miguel.moravec@vanderbilt.edu
-#This script automatically generates plots of Pacific SST RMSE for the current and last calendar year
-#This script relies on a standard naming convention of daily SST NetCDF files in this directory: /archive/nmme/NMME/INPUTS/oisst/
-#This script also relies on monthly ocean SST NetCDFs from this directory: /archive/x1y/FMS/c3/CM2.1_ECDA/CM2.1R_ECDA_v3.1_1960_pfl_auto/gfdl.ncrc3-intel-prod-openmp/history/tmp/
-#For best results, this script should be run from '/home/x1y/gfdl/ecda_operational/sst/' !!!!
+#This script automatically generates plots of tropical SST RMSE for the current and last calendar year
+#This script relies on a standard naming convention of daily SST NetCDF files in this observations directory: /archive/nmme/NMME/INPUTS/oisst/
+#This script also relies on monthly mean ocean SST NetCDFs from this model directory: /archive/x1y/FMS/c3/CM2.1_ECDA/CM2.1R_ECDA_v3.1_1960_pfl_auto/gfdl.ncrc3-intel-prod-openmp/history/tmp/
 
 import subprocess as p
 import datetime
@@ -36,14 +35,14 @@ def mymain(argv):
 
 	for opt, arg in opts:
  		if opt == '-h': #help option
-        		print '\nThis script automatically generates plots of Pacific SST RMSE for the current and last calendar year \n'
+        		print '\nThis script automatically generates plots of tropical SST RMSE for the current and last calendar year \n'
 			print 'Options are as follows:'
 			print "'-h' launches this help text"
 			print "'-t' generates today's most recent plots"
 			print "'-d mmyyy' generates 2yr plots up to a specified date i.e. '-d 072016' \n"
-			print 'This script relies on a standard naming convention of daily SST NetCDF files in this directory:'
+			print 'This script relies on a standard naming convention of daily SST NetCDF files in this observations directory:'
 			print '/archive/nmme/NMME/INPUTS/oisst/ \n'
-			print 'This script also relies on monthly ocean SST NetCDFs from this directory:'
+			print 'This script also relies on monthly mean ocean SST NetCDFs from this model directory:'
 			print '/archive/x1y/FMS/c3/CM2.1_ECDA/CM2.1R_ECDA_v3.1_1960_pfl_auto/gfdl.ncrc3-intel-prod-openmp/history/tmp/ \n'
 			print 'For best results, this script should be run from "/home/x1y/gfdl/ecda_operational/sst/" !!!! \n'
 			print 'Written by Miguel M. Moravec. For questions please email miguel.moravec@vanderbilt.edu \n'
@@ -95,7 +94,7 @@ def mymain(argv):
 		print 'ERROR: NetCDF data not available yet for ' + month + '/' + year + '. Exiting . . . '
 		exit(1)
 
-
+	#sets parameters for loop function
 	
 	d ="." #the local directory
 
@@ -147,6 +146,8 @@ def mymain(argv):
 	with open(outputfile,'w') as F:
 	    F.write(myout)
 
+	#checks make_des
+
 	if os.path.isfile(str(outputfile))==False:
 		print "ERROR. Make_des process fail. Please ensure data files are located in their proper directories. See '-h'. \nExiting . . ."
 		exit(1)
@@ -154,7 +155,7 @@ def mymain(argv):
     		print "ERROR. Make_des process fail. Please ensure data files are located in their proper directories. See '-h'. \nExiting . . ."
 		exit(1)
 
-	#lines 44-99 replace Xiaosong's csh script and makeS one NetCDF file in the local dir with two calendar years worth of daily SST data averaged monthly	
+	#next ~70 lines replace Xiaosong's csh script and makeS one NetCDF file in the local dir with two calendar years worth of daily SST data averaged monthly	
 
 	if ( not pyferret.start(quiet=True, journal=False, unmapped=True) ):
 		print "ERROR. Pyferret start failed. Exiting . . ."
@@ -252,19 +253,21 @@ def mymain(argv):
 
 	header()
 	
-	#cmd7 = "use " + sst_outfile_combo
 	cmd8 = "let temp2 = temp[d=2, gxy=sst[d=1],gt=sst[d=1]@asn]"
 	cmd9 = "let err1 = sst[d=1,z=0,l=1:" + timeline + "] - temp2[d=2,l=1:" + timeline+ "]"
-	cmd11 = 'sha/lev=(0.,2.0,0.25)(2.0,3.0,0.5) var1[y=30s:30n,l=1:' + timeline + '@ave]^0.5'
+
+	cmd10 = 'sha/lev=(0.,2.0,0.25)(2.0,3.0,0.5) var1[y=30s:30n,l=1:' + timeline + '@ave]^0.5'
+	cmd11 = str('ANNOTATE/NOUSER/XPOS=2/YPOS=6.25 "SST RMSE ' + year_prev + '-' + year + '"')
 	cmd12 = 'set mode/last verify'
-	cmd13 = 'FRAME/FILE=' + filename
+	cmd13 = 'FRAME/FILE=' + filename #saves png
 
 	(errval, errmsg) = pyferret.run(cmd7)
 	(errval, errmsg) = pyferret.run(cmd8)
 	(errval, errmsg) = pyferret.run(cmd9)
 
-	body()
+	body() #####runs before cmd10-13
 
+	(errval, errmsg) = pyferret.run(cmd10)
 	(errval, errmsg) = pyferret.run(cmd11)
 	(errval, errmsg) = pyferret.run(cmd12)
 	(errval, errmsg) = pyferret.run(cmd13)
@@ -273,12 +276,13 @@ def mymain(argv):
 	if os.path.exists("tmp1.nc"):
 		os.remove("tmp1.nc")
 
+	#image file/script check
 	if os.path.exists(str(filename)):
 		if check == 0:
-			print 'SUCCESS. Plot image file for Pacific SST RMSE ' + year_prev + '/' + year + ' since ' + month_abrev + ' is located in the local directory and is named: ' + filename
+			print 'SUCCESS. Plot image file for tropical SST RMSE ' + year_prev + '/' + year + ' since ' + month_abrev + ' is located in the local directory and is named: ' + filename
 
 		if check == 1:
-			print 'ERROR. PARTIAL SUCCESS. Plot image file for Pacific SST RMSE (' + year + ' ONLY!!!) is located in the local directory and is named: ' + filename
+			print 'ERROR. PARTIAL SUCCESS. Plot image file for tropical SST RMSE (' + year + ' ONLY!!!) is located in the local directory and is named: ' + filename
 	else:
 		print "ERROR. No plots generated. Please ensure data files are located in their proper directories. See '-h'"
 		exit(1)
